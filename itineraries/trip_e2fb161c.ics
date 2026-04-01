@@ -1,0 +1,90 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Travel Concierge Agent//EN
+CALSCALE:GREGORIAN
+X-WR-CALNAME:Trip to Rajasthan
+BEGIN:VEVENT
+SUMMARY:Day 1: Day 1
+DTSTART;VALUE=DATE:20260401
+DTEND;VALUE=DATE:20260402
+UID:aeb45a8d-6db0-40c3-9e9d-8eacbede7b39@travel-concierge
+DESCRIPTION:**Day 1**\n- 07:30 🍳 Breakfast: Anokhi Cafe — try their s
+ ignature pancakes\, ~₹250/person\n- 09:30 🏛️ Morning: City Palace (
+ open 09:30–17:30\, entry ₹300) — a majestic palace showcasing a blen
+ d of Rajput and Mughal architecture\n  → Transport: Auto-rickshaw from h
+ otel\, ₹50\, 15 minutes\n- 13:00 🍽️ Lunch: Barbeque Nation — reco
+ mmended: their veg and non-veg buffet\, ~₹600/person\n- 15:00 🎭 After
+ noon: Jantar Mantar (open 09:00–16:30\, entry ₹50) — an ancient astr
+ onomical observatory with massive sundials and instruments\n  → Transpor
+ t: Walking distance from City Palace\n- 19:00 🌅 Sunset: Nahargarh Fort 
+ — watch the sunset over the city from this historic fort\n- 20:00 🍷 D
+ inner: Chokhi Dhani — must-try: their traditional Rajasthani thali\, ~
+ ₹500/person\n- 💡 Local tip: Try to avoid traveling during peak hours 
+ to avoid traffic congestion\n- ☔ Indoor backup: Visit the Albert Hall Mu
+ seum (open 09:00–17:30\, entry ₹40) to explore its collection of artif
+ acts and exhibits\n- 👥 Group tip: As a solo traveler\, consider joining
+  a guided tour to meet fellow travelers and gain insights from local guide
+ s
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Day 2: try their signature pancakes\, ~₹250/person
+DTSTART;VALUE=DATE:20260402
+DTEND;VALUE=DATE:20260403
+UID:ec2142b2-b817-4835-a0c7-020adf88e028@travel-concierge
+DESCRIPTION:**Day 2**\n- 07:30 🍳 Breakfast: Brown Sugar — try their c
+ hocolate waffles\, ~₹200/person\n- 09:30 🏛️ Morning: Amber Fort (op
+ en 08:00–18:00\, entry ₹200) — a stunning fort with intricate carvin
+ gs and mirror work\n  → Transport: Hire a taxi for the day\, ₹1\,500\,
+  30 minutes to Amber Fort\n- 13:00 🍽️ Lunch: The Verandah — recomme
+ nded: their veg and non-veg wraps\, ~₹400/person\n- 15:00 🎭 Afternoon
+ : Johri Bazaar — explore this bustling marketplace for jewelry\, textile
+ s\, and souvenirs\n  → Transport: Taxi from Amber Fort\, included in day
+ 's hire\n- 19:00 🌅 Sunset: Jal Mahal — admire the beautiful palace in
+  the middle of Man Sagar Lake\n- 20:00 🍷 Dinner: The Forresta Kitchen &
+  Bar — must-try: their wood-fired pizzas\, ~₹600/person\n- 💡 Local 
+ tip: Bargain while shopping at Johri Bazaar to get the best deals\n- ☔ I
+ ndoor backup: Visit the Jawahar Kala Kendra (open 10:00–17:00\, entry fr
+ ee) to explore its art galleries and exhibitions\n- 👥 Group tip: As a s
+ olo traveler\, consider staying in a hostel to meet fellow travelers and m
+ ake new friends
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Day 3: try their chocolate waffles\, ~₹200/person
+DTSTART;VALUE=DATE:20260403
+DTEND;VALUE=DATE:20260404
+UID:490bba41-6c3b-491a-969d-a053076b2ecb@travel-concierge
+DESCRIPTION:**Day 3**\n- 07:30 🍳 Breakfast: Cafe Lazy Mojo — try thei
+ r pancakes\, ~₹250/person\n- 09:30 🏛️ Morning: Ajmer Sharif Dargah 
+ (open 05:00–21:00\, entry free) — a sacred Sufi shrine and mosque\n  
+ → Transport: Take the train from Jaipur to Ajmer\, ₹100\, 2 hours\n- 1
+ 3:00 🍽️ Lunch: Mango Masala — recommended: their veg and non-veg cu
+ rries\, ~₹300/person\n- 15:00 🎭 Afternoon: Ana Sagar Lake — take a 
+ boat ride and enjoy the scenic views\n  → Transport: Auto-rickshaw from 
+ Ajmer Sharif Dargah\, ₹50\, 10 minutes\n- 19:00 🌅 Sunset: Nasiyan Red
+  Temple — watch the sunset from this unique temple\n- 20:00 🍷 Dinner:
+  Sheesh Mahal — must-try: their traditional Rajasthani dishes\, ~₹500/
+ person\n- 💡 Local tip: Respect the dress code and customs while visitin
+ g the Ajmer Sharif Dargah\n- ☔ Indoor backup: Visit the Government Museu
+ m (open 10:00–17:00\, entry ₹20) to explore its collection of artifact
+ s and exhibits\n- 👥 Group tip: As a solo traveler\, consider hiring a l
+ ocal guide to explore the city and its hidden gems
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Day 4: try their pancakes\, ~₹250/person
+DTSTART;VALUE=DATE:20260404
+DTEND;VALUE=DATE:20260405
+UID:8086e67f-caf8-4b2a-96b4-3494ecb0a71b@travel-concierge
+DESCRIPTION:**Day 4**\n- 07:30 🍳 Breakfast: The Coffee Shop — try the
+ ir omelets\, ~₹150/person\n- 09:30 🏛️ Morning: Shopping for souveni
+ rs at Bapu Bazaar — explore this bustling marketplace for textiles\, jew
+ elry\, and souvenirs\n  → Transport: Walking distance from hotel\n- 12:0
+ 0 🍽️ Lunch: Surya Mahal — recommended: their veg and non-veg thalis
+ \, ~₹400/person\n- 14:00 🎭 Afternoon: Relax at the hotel or explore t
+ he nearby area\n- 16:00 🚂 Departure: Take the train from Ajmer to Mumba
+ i\, ₹1\,500\, 16 hours\n- 💡 Local tip: Double-check the train schedul
+ e and booking before departure\n- ☔ Indoor backup: Visit the hotel's ind
+ oor pool or spa to relax before departure\n- 👥 Group tip: As a solo tra
+ veler\, consider sharing a taxi or train with fellow travelers to split co
+ sts and make new friends
+END:VEVENT
+END:VCALENDAR

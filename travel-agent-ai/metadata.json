@@ -1,0 +1,5 @@
+{
+  "name": "Travel Agent AI",
+  "description": "An autonomous agent that plans travel itineraries using multi-step reasoning and tools.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,59 @@
+{
+  "last_destination": "Goa",
+  "diet": "Veg",
+  "budget_style": "mid-range",
+  "home_city": "Delhi, India",
+  "nationality": "Indian",
+  "past_trips": [
+    {
+      "destination": "Paris",
+      "budget_inr": 45000,
+      "date": "2026-03-21"
+    },
+    {
+      "destination": "Noida",
+      "budget_inr": 45000,
+      "date": "2026-03-21"
+    },
+    {
+      "destination": "Noida",
+      "budget_inr": 100000,
+      "date": "2026-03-21"
+    },
+    {
+      "destination": "Noida",
+      "budget_inr": 80000,
+      "date": "2026-03-21"
+    },
+    {
+      "destination": "Goa",
+      "budget_inr": 90000,
+      "date": "2026-03-25"
+    },
+    {
+      "destination": "Rajasthan",
+      "budget_inr": 60000,
+      "date": "2026-03-25"
+    },
+    {
+      "destination": "Rajasthan",
+      "budget_inr": 45000,
+      "date": "2026-03-25"
+    },
+    {
+      "destination": "Rajasthan",
+      "budget_inr": 45000,
+      "date": "2026-03-25"
+    },
+    {
+      "destination": "Jaipur",
+      "budget_inr": 45000,
+      "date": "2026-03-25"
+    },
+    {
+      "destination": "Goa",
+      "budget_inr": 45000,
+      "date": "2026-04-02"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+# Project
+history.json
+user_memory.json
+itineraries/
+
+# Node / frontend
+travel-agent-ai/node_modules/
+travel-agent-ai/dist/
+travel-agent-ai/.vite/
+npm-debug.log
+yarn-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+venv/
+env/
+
+# Env / secrets
+.env
+.env.*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+pip-log.txt
+npm-debug.log*

@@ -33,7 +33,7 @@ from icalendar import Calendar, Event as ICSEvent, vText
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import Tool
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 
 
@@ -93,10 +93,9 @@ CORS(app, origins=ALLOWED_ORIGIN)
 # LLM
 # ═══════════════════════════════════════════════════════════════════════════════
 
-llm = ChatOpenAI(
+llm = ChatGroq(
     model=MODEL,
-    openai_api_key=GROQ_API_KEY,
-    openai_api_base="https://api.groq.com/openai/v1",
+    groq_api_key=GROQ_API_KEY,
     temperature=0.2,
     max_tokens=3000,
 )
@@ -175,6 +174,7 @@ class TravelState(TypedDict):
     ics_path:         str
     calendar_events:  list
     memory:           dict
+    overlap_warning:  str
     logs:             Annotated[list, operator.add]
 
 
@@ -504,6 +504,7 @@ def tool_ics_writer(data_json: str) -> str:
 
 def tool_get_weather(location: str) -> str:
     """Fetch real weather from wttr.in (no API key required)."""
+    import ssl
     logger.log("TOOL", f"Weather: {location}", "")
     try:
         url = (
@@ -511,7 +512,10 @@ def tool_get_weather(location: str) -> str:
             "?format=%C+%t+%h+%w&m"
         )
         req = urllib.request.Request(url, headers={"User-Agent": "TravelConcierge/3.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
             raw = resp.read().decode("utf-8", errors="replace").strip()
         return raw if raw and len(raw) < 200 else "Weather data unavailable"
     except Exception:
@@ -605,7 +609,26 @@ def run_agent(task: str, destination: str, fallback: str) -> str:
             last_error = exc
             logger.log("AGENT", f"Attempt {attempt} failed", str(exc))
             if attempt < 3:
-                time.sleep(2)
+                time.sleep(1)
+
+    # ── Enhanced fallback: direct LLM call with web search context ────────
+    logger.log("AGENT", "Tool-calling failed — trying direct LLM", str(last_error)[:80])
+    try:
+        search_context = tool_web_search(f"{destination} travel guide attractions restaurants budget INR")
+        enriched_prompt = (
+            f"{task}\n\n"
+            f"Here is some research data to help you:\n{search_context}\n\n"
+            f"Provide a comprehensive, specific answer. Name real places, real restaurants, "
+            f"and real attractions in {destination}. Do NOT use placeholders."
+        )
+        direct_result = llm_call(enriched_prompt, fallback)
+        direct_result = sanitize_output(direct_result, destination, fallback)
+        if not looks_bad_output(direct_result):
+            logger.log("AGENT", "Direct LLM succeeded", direct_result[:100])
+            return direct_result
+    except Exception as direct_exc:
+        logger.log("AGENT", "Direct LLM also failed", str(direct_exc)[:80])
+
     logger.log("AGENT", "All attempts failed — using fallback", str(last_error))
     return fallback
 
@@ -923,6 +946,53 @@ def build_calendar_feed(page: int = 1, per: int = 100) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# OVERLAP DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def check_date_overlap(start_date_str: str, duration_days: int) -> list[dict]:
+    """Check if the requested trip dates overlap with any existing trips in history."""
+    try:
+        new_start = datetime.date.fromisoformat(valid_date_string(start_date_str))
+    except Exception:
+        return []
+    new_end = new_start + datetime.timedelta(days=max(1, duration_days) - 1)
+
+    history = load_normalized_history(persist=False)
+    conflicts = []
+    for trip in history:
+        trip_start_str = trip.get("start_date", "")
+        try:
+            trip_start = datetime.date.fromisoformat(valid_date_string(trip_start_str))
+        except Exception:
+            continue
+        # Determine trip duration from events or default to number of events
+        events = trip.get("events", [])
+        if events:
+            event_dates = []
+            for ev in events:
+                try:
+                    event_dates.append(datetime.date.fromisoformat(ev.get("date", "")[:10]))
+                except Exception:
+                    pass
+            if event_dates:
+                trip_end = max(event_dates)
+            else:
+                trip_end = trip_start
+        else:
+            trip_end = trip_start
+
+        # Check overlap: two ranges overlap if start1 <= end2 AND start2 <= end1
+        if new_start <= trip_end and trip_start <= new_end:
+            conflicts.append({
+                "destination": trip.get("destination", "Unknown"),
+                "start_date": str(trip_start),
+                "end_date": str(trip_end),
+                "trip_id": trip.get("id", ""),
+            })
+    return conflicts
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # GRAPH NODES
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -976,7 +1046,26 @@ def parse_goal_node(state: TravelState) -> TravelState:
 
     ms = int((datetime.datetime.now() - t0).total_seconds() * 1000)
     logger.log("PLANNER", "Goal parsed", json.dumps(parsed), duration_ms=ms)
-    return {**state, "parsed_goal": parsed, "memory": memory, "logs": [{"node": "PLANNER"}]}
+    # ── Check for date overlaps with existing trips ────────────────────────
+    overlap_warning = ""
+    conflicts = check_date_overlap(
+        parsed.get("start_date", ""),
+        parse_int(parsed.get("duration_days"), 3),
+    )
+    if conflicts:
+        parts = []
+        for c in conflicts:
+            parts.append(
+                f"  • {c['destination']} ({c['start_date']} to {c['end_date']})"
+            )
+        overlap_warning = (
+            "⚠️ **Schedule Conflict Detected!** Your requested dates overlap "
+            "with existing trip(s):\n" + "\n".join(parts) + "\n"
+            "Consider choosing different dates to avoid conflicts."
+        )
+        logger.log("PLANNER", "Overlap detected", overlap_warning[:120])
+
+    return {**state, "parsed_goal": parsed, "memory": memory, "overlap_warning": overlap_warning, "logs": [{"node": "PLANNER"}]}
 
 
 def weather_node(state: TravelState) -> TravelState:
@@ -1100,6 +1189,14 @@ def curator_node(state: TravelState) -> TravelState:
         else ""
     )
 
+    overlap_note = state.get("overlap_warning", "")
+    overlap_instruction = ""
+    if overlap_note:
+        overlap_instruction = (
+            f"\n\nIMPORTANT SCHEDULING NOTE: {overlap_note}\n"
+            "Mention this conflict clearly at the start of the itinerary."
+        )
+
     task = f"""
 You are an award-winning luxury travel concierge. Create an EXCEPTIONAL, highly detailed,
 {goal['duration_days']}-day itinerary for {goal['destination']} only.
@@ -1110,6 +1207,7 @@ Context:
 - Budget style:     {goal.get('budget_style', 'mid-range')}
 - Current weather:  {weather or 'check locally'}
 - Origin:           {goal['origin']}
+{overlap_instruction}
 
 STRICT RULES:
 1. Name REAL, specific restaurants that are {goal['diet']}-friendly.
@@ -1299,10 +1397,18 @@ def assemble_node(state: TravelState) -> TravelState:
     )
     weather_info = state.get("weather_info", "")
     packing_list = state.get("packing_list", "")
+    overlap_warning = state.get("overlap_warning", "")
 
     final_itinerary = format_final_itinerary(
         goal, activities, budget_summary, safety_info, weather_info, packing_list
     )
+
+    # Prepend overlap warning if present
+    if overlap_warning:
+        final_itinerary = (
+            "> " + overlap_warning.replace("\n", "\n> ") +
+            "\n\n" + final_itinerary
+        )
 
     calendar_events = extract_calendar_events(activities, start_date)
 
@@ -1465,6 +1571,7 @@ def api_plan():
         "ics_path":         "",
         "calendar_events":  [],
         "memory":           load_memory(),
+        "overlap_warning":  "",
         "logs":             [],
     }
 

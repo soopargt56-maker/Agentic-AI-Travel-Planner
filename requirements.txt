@@ -4,5 +4,5 @@ duckduckgo-search
 icalendar
 langchain
 langchain-core
-langchain-openai
+langchain-groq
 langgraph

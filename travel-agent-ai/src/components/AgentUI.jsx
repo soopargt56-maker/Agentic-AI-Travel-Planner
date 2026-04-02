@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Send, Loader2, MapPin, Play, FileText, CheckCircle2, AlertCircle, ArrowRight, Calendar as CalendarIcon, Download } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
+import { Send, Loader2, MapPin, Play, FileText, CheckCircle2, AlertCircle, ArrowRight, Calendar as CalendarIcon, Download, ChevronLeft, ChevronRight, Clock, Trash2, Brain, User } from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isToday, isSameMonth } from 'date-fns';
 
 export default function AgentUI() {
   const [input, setInput] = useState('');
@@ -13,6 +13,9 @@ export default function AgentUI() {
   const [history, setHistory] = useState([]);
   const [activeTrip, setActiveTrip] = useState(null);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [memoryData, setMemoryData] = useState(null);
+  const [leftPanel, setLeftPanel] = useState('trace'); // 'trace' or 'history'
   
   const logsEndRef = useRef(null);
 
@@ -26,7 +29,18 @@ export default function AgentUI() {
 
   useEffect(() => {
     loadHistory();
+    loadMemory();
   }, []);
+
+  const loadMemory = async () => {
+    try {
+      const response = await fetch('/api/memory');
+      const data = await response.json();
+      setMemoryData(data);
+    } catch (e) {
+      console.error("Failed to load memory", e);
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -34,7 +48,6 @@ export default function AgentUI() {
       const data = await response.json();
       setHistory(data || []);
       if (data && data.length > 0) {
-        // Find if we had an active one in memory, else pick latest
         const savedId = localStorage.getItem('activeTripId');
         const active = data.find(t => t.id === savedId) || data[data.length - 1];
         displayTrip(active);
@@ -49,7 +62,6 @@ export default function AgentUI() {
     localStorage.setItem('activeTripId', trip.id);
     setActiveTrip(trip);
     
-    // Parse calendar events if available in backend response
     if (trip.events && trip.events.length > 0) {
       const formattedEvents = trip.events.map(ev => ({
         date: ev.date,
@@ -57,14 +69,30 @@ export default function AgentUI() {
         description: ev.info
       }));
       setCalendarEvents(formattedEvents);
+      if (formattedEvents.length > 0) setCurrentDate(parseISO(formattedEvents[0].date));
     } else {
       setCalendarEvents([]); 
+      setCurrentDate(new Date());
     }
   };
 
   const selectHistory = (id) => {
     const trip = history.find(t => t.id === id);
     if (trip) displayTrip(trip);
+  };
+
+  const deleteTrip = async (e, id) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/trip/${id}`, { method: 'DELETE' });
+      setHistory(prev => prev.filter(t => t.id !== id));
+      if (activeTrip?.id === id) {
+        setActiveTrip(null);
+        setCalendarEvents([]);
+      }
+    } catch (err) {
+      console.error("Failed to delete trip", err);
+    }
   };
 
   const startAgent = async () => {
@@ -75,8 +103,8 @@ export default function AgentUI() {
     setIsProcessing(true);
     setActiveTrip(null);
     setErrorBanner(null);
+    setLeftPanel('trace');
 
-    // Initial goal log
     setLogs([{ id: 'goal', type: 'goal', content: goal, node: 'USER', timestamp: new Date() }]);
 
     let lastCount = 0;
@@ -94,12 +122,11 @@ export default function AgentUI() {
             content: log.content || log.event || "",
             node: log.node,
             duration: log.duration_ms,
-            timestamp: new Date() // approximate
+            timestamp: new Date()
           }));
           
           setLogs(prev => {
             const newLogs = [...prev];
-            // keep the goal at the start
             return [newLogs[0], ...formattedLogs];
           });
         }
@@ -127,7 +154,6 @@ export default function AgentUI() {
       if (data.is_infeasible) {
         setErrorBanner('Trip rejected: over budget or infeasible.');
       } else {
-        // Extract calendar events from the backend response
         if (data.trip && data.trip.events) {
           const formattedEvents = data.trip.events.map(ev => ({
             date: ev.date,
@@ -135,14 +161,18 @@ export default function AgentUI() {
             description: ev.info
           }));
           setCalendarEvents(formattedEvents);
+          if (formattedEvents.length > 0) setCurrentDate(parseISO(formattedEvents[0].date));
         } else {
           setCalendarEvents([]);
+          setCurrentDate(new Date());
         }
 
         setLogs(prev => [...prev, { id: 'fin', type: 'final_answer', content: 'Trip planning completed.', node: 'SYSTEM', timestamp: new Date() }]);
       }
 
       displayTrip(data.trip);
+      loadHistory();
+      loadMemory();
 
     } catch (error) {
       clearInterval(poll);
@@ -172,6 +202,18 @@ export default function AgentUI() {
     }
   };
 
+  // Calendar helpers
+  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+  const goToday = () => setCurrentDate(new Date());
+
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(monthStart);
+  const calStart = startOfWeek(monthStart);
+  const calEnd = endOfWeek(monthEnd);
+  const calDays = eachDayOfInterval({ start: calStart, end: calEnd });
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm relative z-20">
@@ -198,42 +240,167 @@ export default function AgentUI() {
 
       <main className="flex-1 overflow-hidden flex flex-col md:flex-row relative z-10">
         
-        {/* Left Agent Trace Log */}
+        {/* Left Panel: Trace / History / Memory */}
         <div className="w-full md:w-80 lg:w-96 flex flex-col border-r border-gray-200 bg-white flex-shrink-0">
-          <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h2 className="text-sm font-medium text-gray-900">System Trace</h2>
-            <span className="text-[10px] font-mono bg-blue-100 text-blue-700 px-2 py-1 rounded">LangGraph</span>
+          {/* Left panel tabs */}
+          <div className="flex border-b border-gray-200 bg-gray-50">
+            <button
+              onClick={() => setLeftPanel('trace')}
+              className={`flex-1 py-3 px-3 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${leftPanel === 'trace' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Trace
+              </span>
+            </button>
+            <button
+              onClick={() => setLeftPanel('history')}
+              className={`flex-1 py-3 px-3 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${leftPanel === 'history' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> History
+                {history.length > 0 && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1">{history.length}</span>}
+              </span>
+            </button>
+            <button
+              onClick={() => setLeftPanel('memory')}
+              className={`flex-1 py-3 px-3 text-xs font-semibold uppercase tracking-wider transition-colors border-b-2 ${leftPanel === 'memory' ? 'border-blue-600 text-blue-600 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Brain className="w-3.5 h-3.5" /> Memory
+              </span>
+            </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {logs.length === 0 ? (
-              <div className="text-center text-sm text-gray-400 mt-10">No active processes.</div>
-            ) : null}
-            {logs.map((log) => (
-              <div key={log.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="mt-0.5 flex-shrink-0">
-                  {getIcon(log.type)}
-                </div>
-                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm text-sm">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">
-                      {log.node} {log.duration ? `(${log.duration}ms)` : ''}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      {log.timestamp.toLocaleTimeString()}
-                    </span>
+          {/* LEFT PANEL CONTENT */}
+          <div className="flex-1 overflow-y-auto">
+
+            {/* TRACE TAB */}
+            {leftPanel === 'trace' && (
+              <div className="p-4 space-y-4">
+                {logs.length === 0 ? (
+                  <div className="text-center text-sm text-gray-400 mt-10">No active processes.</div>
+                ) : null}
+                {logs.map((log) => (
+                  <div key={log.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {getIcon(log.type)}
+                    </div>
+                    <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600">
+                          {log.node} {log.duration ? `(${log.duration}ms)` : ''}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {log.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-800 font-mono whitespace-pre-wrap break-words">
+                        {log.type === 'reasoning' || log.type === 'final_answer' || log.type === 'goal' ? (
+                          log.content
+                        ) : (
+                          <div className="opacity-70">{log.content.substring(0, 150)}{log.content.length > 150 ? '...' : ''}</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-800 font-mono whitespace-pre-wrap break-words">
-                    {log.type === 'reasoning' || log.type === 'final_answer' || log.type === 'goal' ? (
-                      log.content
-                    ) : (
-                      <div className="opacity-70">{log.content.substring(0, 150)}{log.content.length > 150 ? '...' : ''}</div>
-                    )}
-                  </div>
-                </div>
+                ))}
+                <div ref={logsEndRef} />
               </div>
-            ))}
-            <div ref={logsEndRef} />
+            )}
+
+            {/* HISTORY TAB */}
+            {leftPanel === 'history' && (
+              <div className="p-3 space-y-2">
+                {history.length === 0 ? (
+                  <div className="text-center text-sm text-gray-400 mt-10">No trip history yet.</div>
+                ) : (
+                  [...history].reverse().map((trip) => {
+                    const isActive = activeTrip?.id === trip.id;
+                    const dest = trip.destination || trip.goal?.destination || 'Unknown';
+                    const date = trip.created_at ? format(parseISO(trip.created_at), 'MMM d, yyyy') : trip.date || '';
+                    const budget = trip.goal?.budget_inr;
+                    const days = trip.goal?.duration_days;
+                    return (
+                      <div
+                        key={trip.id}
+                        onClick={() => selectHistory(trip.id)}
+                        className={`group p-3 rounded-lg border cursor-pointer transition-all duration-200 ${isActive ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/30'}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <MapPin className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                              <span className={`text-sm font-semibold truncate ${isActive ? 'text-blue-700' : 'text-gray-800'}`}>{dest}</span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1.5 ml-5">
+                              {days && <span className="text-[10px] text-gray-500">{days} days</span>}
+                              {budget && <span className="text-[10px] text-gray-500">₹{Number(budget).toLocaleString()}</span>}
+                              {date && <span className="text-[10px] text-gray-400">{date}</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => deleteTrip(e, trip.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-all"
+                            title="Delete trip"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* MEMORY TAB */}
+            {leftPanel === 'memory' && (
+              <div className="p-4 space-y-4">
+                {memoryData ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Traveler Profile</p>
+                        <p className="text-[11px] text-gray-400">Learned from your trips</p>
+                      </div>
+                    </div>
+                    {[
+                      { label: 'Home City', value: memoryData.home_city, emoji: '🏠' },
+                      { label: 'Nationality', value: memoryData.nationality, emoji: '🌍' },
+                      { label: 'Diet', value: memoryData.diet, emoji: '🍽️' },
+                      { label: 'Budget Style', value: memoryData.budget_style, emoji: '💰' },
+                      { label: 'Last Destination', value: memoryData.last_destination, emoji: '📍' },
+                    ].map(({ label, value, emoji }) => (
+                      <div key={label} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <span className="text-xs text-gray-500 flex items-center gap-2"><span>{emoji}</span>{label}</span>
+                        <span className="text-xs font-semibold text-gray-800">{value || '—'}</span>
+                      </div>
+                    ))}
+                    {memoryData.past_trips && memoryData.past_trips.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Past Trips ({memoryData.past_trips.length})</p>
+                        <div className="space-y-1.5">
+                          {memoryData.past_trips.slice(-5).reverse().map((pt, i) => (
+                            <div key={i} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-xs">
+                              <span className="font-medium text-gray-700">{pt.destination}</span>
+                              <div className="flex items-center gap-2 text-gray-400">
+                                <span>₹{Number(pt.budget_inr).toLocaleString()}</span>
+                                <span>{pt.date}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center text-sm text-gray-400 mt-10">Loading memory...</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -292,48 +459,75 @@ export default function AgentUI() {
                   )}
                 </>
               ) : (
-                <div className="flex-1 flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden relative p-6">
-                  {(() => {
-                    const displayDate = calendarEvents.length > 0 ? parseISO(calendarEvents[0].date) : new Date();
-                    const monthStart = startOfMonth(displayDate);
-                    const monthEnd = endOfMonth(monthStart);
-                    const startDate = startOfWeek(monthStart);
-                    const endDate = endOfWeek(monthEnd);
-                    const days = eachDayOfInterval({ start: startDate, end: endDate });
-                    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                /* ═══════════ FULL CALENDAR VIEW ═══════════ */
+                <div className="flex-1 flex flex-col h-full bg-white rounded-xl border border-gray-200 overflow-hidden relative">
+                  {/* Calendar Header */}
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <h3 className="text-2xl font-semibold text-gray-900">{format(monthStart, 'MMMM yyyy')}</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={goToday}
+                        className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm text-gray-600"
+                      >
+                        Today
+                      </button>
+                      <button onClick={prevMonth} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors shadow-sm">
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                      </button>
+                      <button onClick={nextMonth} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors shadow-sm">
+                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
 
-                    return (
-                      <div className="flex flex-col h-full overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                          <h3 className="text-2xl font-semibold text-gray-900">{format(monthStart, 'MMMM yyyy')}</h3>
-                        </div>
-                        <div className="grid grid-cols-7 gap-2 mb-2">
-                          {weekDays.map(day => (
-                            <div key={day} className="text-center text-sm font-semibold text-gray-500 py-2">{day}</div>
-                          ))}
-                        </div>
-                        <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-[minmax(100px,1fr)]">
-                          {days.map(day => {
-                            const dayString = format(day, 'yyyy-MM-dd');
-                            const dayEvents = calendarEvents.filter(e => e.date === dayString);
-                            const isCurrentMonth = format(day, 'M') === format(monthStart, 'M');
-                            return (
-                              <div key={day.toString()} className={`border rounded-lg p-2 flex flex-col transition-colors ${isCurrentMonth ? 'bg-white' : 'bg-gray-50 text-opacity-50'} ${dayEvents.length > 0 ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-gray-200'}`}>
-                                <span className={`text-sm font-medium mb-2 ${dayEvents.length > 0 ? 'text-blue-700' : 'text-gray-400'}`}>{format(day, 'd')}</span>
-                                <div className="flex-1 overflow-y-auto space-y-1.5">
-                                  {dayEvents.map((evt, i) => (
-                                    <div key={i} className="text-xs leading-tight bg-blue-100 text-blue-800 p-1.5 rounded border border-blue-200" title={evt.description}>
-                                      <div className="font-semibold truncate">{evt.title}</div>
-                                    </div>
-                                  ))}
-                                </div>
+                  {/* Weekday headers */}
+                  <div className="grid grid-cols-7 border-b border-gray-100">
+                    {weekDays.map(day => (
+                      <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2.5 uppercase tracking-wider">{day}</div>
+                    ))}
+                  </div>
+
+                  {/* Calendar grid */}
+                  <div className="grid grid-cols-7 flex-1 auto-rows-[minmax(90px,1fr)]">
+                    {calDays.map(day => {
+                      const dayString = format(day, 'yyyy-MM-dd');
+                      const dayEvents = calendarEvents.filter(e => e.date === dayString);
+                      const inMonth = isSameMonth(day, monthStart);
+                      const today = isToday(day);
+                      return (
+                        <div
+                          key={day.toString()}
+                          className={`border-b border-r border-gray-100 p-1.5 flex flex-col transition-colors
+                            ${!inMonth ? 'bg-gray-50/70' : 'bg-white'}
+                            ${dayEvents.length > 0 ? 'bg-blue-50/60' : ''}
+                            ${today ? 'ring-2 ring-inset ring-blue-400' : ''}
+                          `}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full
+                              ${today ? 'bg-blue-600 text-white' : ''}
+                              ${!today && dayEvents.length > 0 ? 'text-blue-700 font-bold' : ''}
+                              ${!today && dayEvents.length === 0 && inMonth ? 'text-gray-600' : ''}
+                              ${!inMonth && !today ? 'text-gray-300' : ''}
+                            `}>
+                              {format(day, 'd')}
+                            </span>
+                          </div>
+                          <div className="flex-1 overflow-y-auto space-y-1">
+                            {dayEvents.map((evt, i) => (
+                              <div
+                                key={i}
+                                className="text-[10px] leading-tight bg-blue-100 text-blue-800 px-1.5 py-1 rounded border border-blue-200 cursor-default hover:bg-blue-200 transition-colors"
+                                title={evt.description}
+                              >
+                                <div className="font-semibold truncate">{evt.title}</div>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
